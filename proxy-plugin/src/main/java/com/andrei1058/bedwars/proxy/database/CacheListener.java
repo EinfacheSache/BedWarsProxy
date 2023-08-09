@@ -7,18 +7,25 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerLoginEvent;
 
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
 public class CacheListener implements Listener {
+
+    private static final ExecutorService executorService = Executors.newSingleThreadExecutor();
 
     @EventHandler
     // Create cache for player if does not exist yet.
     public void onLogin(PlayerLoginEvent e) {
         if (e == null) return;
-        final Player p = e.getPlayer();
-        Bukkit.getScheduler().runTaskAsynchronously(BedWarsProxy.getPlugin(), () -> {
-            //create cache row for player
-            BedWarsProxy.getStatsCache().createStatsCache(p);
-            //update local cache for player
-            BedWarsProxy.getRemoteDatabase().updateLocalCache(p.getUniqueId());
+        executorService.submit(() -> {
+            final Player p = e.getPlayer();
+            Bukkit.getScheduler().runTaskAsynchronously(BedWarsProxy.getPlugin(), () -> {
+                //create cache row for player
+                BedWarsProxy.getStatsCache().createStatsCache(p);
+                //update local cache for player
+                BedWarsProxy.getRemoteDatabase().updateLocalCache(p.getUniqueId());
+            });
         });
     }
 }
