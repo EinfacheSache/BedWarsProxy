@@ -14,8 +14,7 @@ import org.jetbrains.annotations.Nullable;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import static com.andrei1058.bedwars.proxy.BedWarsProxy.config;
-import static com.andrei1058.bedwars.proxy.BedWarsProxy.getParty;
+import static com.andrei1058.bedwars.proxy.BedWarsProxy.*;
 
 public class ArenaManager implements BedWars.ArenaUtil {
 
@@ -49,9 +48,7 @@ public class ArenaManager implements BedWars.ArenaUtil {
 
         List<CachedArena> arenaList = getArenas();
 
-        for (int i=0; i<arenaList.size(); i++) {
-            if (i >= arenaList.size()) break;
-            CachedArena ca = arenaList.get(i);
+        for (CachedArena ca : arenaList) {
             if (ca.getServer().equals(server) && ca.getRemoteIdentifier().equals(remoteIdentifier)) return ca;
         }
         return null;
@@ -142,12 +139,23 @@ public class ArenaManager implements BedWars.ArenaUtil {
         if(!arenaFound.isEmpty()){
             arena = arenaFound.get(0);
             if(arena.getCurrentPlayers() == 0 && config.getYml().getBoolean(ConfigPath.GENERAL_CONFIGURATION_RANDOMARENAS)) {
-                arena = arenaFound.get(new Random().nextInt(arenaFound.size()-1));
+                arena = arenaFound.get(new Random().nextInt(arenaFound.size()));
             }
 
             arena.addPlayer(p, null);
         }else {
-            p.sendMessage(LanguageManager.get().getMsg(p, Messages.COMMAND_JOIN_NO_EMPTY_FOUND));
+            List<CachedArena> arenaFoundSecondTry= arenaList.stream().filter(a -> {
+                if (a.getCurrentPlayers() >= a.getMaxPlayers()) return false;
+                return a.getMaxPlayers() - a.getCurrentPlayers() >= amount;
+            }).sorted(getComparator()).collect(Collectors.toList());
+            if(!arenaFoundSecondTry.isEmpty()) {
+                arena = arenaFoundSecondTry.get(0);
+                if (arena.getCurrentPlayers() == 0 && config.getYml().getBoolean(ConfigPath.GENERAL_CONFIGURATION_RANDOMARENAS)) {
+                    arena = arenaFoundSecondTry.get(new Random().nextInt(arenaFoundSecondTry.size()));
+                }
+                arena.addPlayer(p, null);
+            }else
+                p.sendMessage(LanguageManager.get().getMsg(p, Messages.COMMAND_JOIN_NO_EMPTY_FOUND));
         }
         return true;
     }
