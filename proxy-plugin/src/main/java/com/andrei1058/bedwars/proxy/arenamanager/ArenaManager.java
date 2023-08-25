@@ -13,6 +13,7 @@ import org.jetbrains.annotations.Nullable;
 import org.bukkit.configuration.file.YamlConfiguration;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static com.andrei1058.bedwars.proxy.BedWarsProxy.config;
 import static com.andrei1058.bedwars.proxy.BedWarsProxy.getParty;
@@ -112,9 +113,6 @@ public class ArenaManager implements BedWars.ArenaUtil {
         return true;
     }
 
-    /**
-     * Add a player to the most filled arena from a group.
-     */
     public boolean joinRandomFromGroup(@NotNull Player p, String group) {
         if (getParty().hasParty(p.getUniqueId()) && !getParty().isOwner(p.getUniqueId())) {
             p.sendMessage(LanguageManager.get().getMsg(p, Messages.COMMAND_JOIN_DENIED_NOT_PARTY_LEADER));
@@ -127,21 +125,41 @@ public class ArenaManager implements BedWars.ArenaUtil {
         });
         arenaList.sort(getComparator());
 
-        //shuffle if determined in config
-        if (config.getYml().getBoolean(ConfigPath.GENERAL_CONFIGURATION_RANDOMARENAS)){
-            Collections.shuffle(arenaList);
-        }
 
-
+        final String[] old = {""};
         int amount = BedWarsProxy.getParty().hasParty(p.getUniqueId()) ? BedWarsProxy.getParty().getMembers(p.getUniqueId()).size() : 1;
-        for (CachedArena a : arenaList) {
-            if (a.getCurrentPlayers() >= a.getMaxPlayers()) continue;
-            if (a.getMaxPlayers() - a.getCurrentPlayers() >= amount) {
-                a.addPlayer(p, null);
-                return true;
+        CachedArena arena;
+
+        List<CachedArena> arenaFound = arenaList.stream().filter(a -> {
+            if (old[0].equalsIgnoreCase(a.getServer())) return false;
+            if ((a.getCurrentPlayers() >= a.getMaxPlayers()) || !(a.getMaxPlayers() - a.getCurrentPlayers() >= amount)){
+                old[0] = a.getServer();
+                return false;
             }
+            return true;
+        }).sorted(getComparator()).collect(Collectors.toList());
+
+        if(!arenaFound.isEmpty()){
+            arena = arenaFound.get(0);
+            if(arena.getCurrentPlayers() == 0 && config.getYml().getBoolean(ConfigPath.GENERAL_CONFIGURATION_RANDOMARENAS)) {
+                arena = arenaFound.get(new Random().nextInt(arenaFound.size()));
+            }
+
+            arena.addPlayer(p, null);
+        }else {
+            List<CachedArena> arenaFoundSecondTry= arenaList.stream().filter(a -> {
+                if (a.getCurrentPlayers() >= a.getMaxPlayers()) return false;
+                return a.getMaxPlayers() - a.getCurrentPlayers() >= amount;
+            }).sorted(getComparator()).collect(Collectors.toList());
+            if(!arenaFoundSecondTry.isEmpty()) {
+                arena = arenaFoundSecondTry.get(0);
+                if (arena.getCurrentPlayers() == 0 && config.getYml().getBoolean(ConfigPath.GENERAL_CONFIGURATION_RANDOMARENAS)) {
+                    arena = arenaFoundSecondTry.get(new Random().nextInt(arenaFoundSecondTry.size()));
+                }
+                arena.addPlayer(p, null);
+            }else
+                p.sendMessage(LanguageManager.get().getMsg(p, Messages.COMMAND_JOIN_NO_EMPTY_FOUND));
         }
-        p.sendMessage(LanguageManager.get().getMsg(p, Messages.COMMAND_JOIN_NO_EMPTY_FOUND));
         return true;
     }
 
